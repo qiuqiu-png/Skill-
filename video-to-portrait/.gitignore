@@ -1,0 +1,32 @@
+# 测试视频文件
+*.mp4
+*.avi
+*.mkv
+*.mov
+*.wmv
+*.flv
+*_portrait.*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# 临时文件
+*.tmp
+*.log
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 测试输出
+test_output/
+output/

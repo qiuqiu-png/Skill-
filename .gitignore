@@ -1,0 +1,65 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+*.egg-info/
+
+# 测试文件和临时文件
+test_*
+*.tmp
+*.log
+temp/
+tmp/
+
+# Excel 测试文件
+*.xlsx
+*.xls
+!**/example*.xlsx
+!**/template*.xlsx
+
+# 视频测试文件
+*.mp4
+*.avi
+*.mkv
+*.mov
+*.wmv
+*.flv
+
+# 图片测试文件（保留示例图片）
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+*.webp
+!**/example*.*
+!**/demo*.*
+
+# 输出目录
+output/
+outputs/
+compressed/
+processed/
+*_output/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 备份文件
+backup-skills.sh
+restore-skills.sh
+*.tar.gz
+*.zip

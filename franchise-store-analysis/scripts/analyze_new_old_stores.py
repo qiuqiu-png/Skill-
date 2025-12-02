@@ -241,35 +241,31 @@ def analyze_new_old_stores(sales_file, return_file, org_mapping_file, warehouse_
         for category in categories:
             # 黄金外采-新模式使用特殊计算逻辑
             if category == '黄金外采-新模式':
-                # 批发额 = 入库单（足金）的总成本
+                # 老店批发/毛利 = 0 (黄金外采是新模式,没有老店)
+                old_wholesale_2025 = 0
+                old_profit_2025 = 0
+
+                # 计算入库单总成本
+                warehouse_cost = 0
                 if df_warehouse is not None and len(df_warehouse) > 0:
                     # 确保总成本字段为数字
                     df_warehouse['总成本'] = pd.to_numeric(df_warehouse['总成本'], errors='coerce').fillna(0)
+                    warehouse_cost = df_warehouse['总成本'].sum()
 
-                    # 老店批发 = 0 (黄金外采是新模式,没有老店)
-                    old_wholesale_2025 = 0
-
-                    # 新店批发 = 入库单总成本合计
-                    new_wholesale_2025 = df_warehouse['总成本'].sum()
-                else:
-                    old_wholesale_2025 = 0
-                    new_wholesale_2025 = 0
-
-                # 毛利额 = 其他结算单（已扣款+服务费挂标签）的发生金额/1.06
+                # 计算其他结算单发生金额/1.06
+                settlement_amount = 0
                 if df_other_settlement is not None and len(df_other_settlement) > 0:
                     # 确保发生金额字段为数字
                     df_other_settlement['发生金额'] = pd.to_numeric(df_other_settlement['发生金额'], errors='coerce').fillna(0)
+                    settlement_amount = df_other_settlement['发生金额'].sum() / 1.06
 
-                    # 老店毛利 = 0
-                    old_profit_2025 = 0
+                # 批发额 = 入库单总成本 + 其他结算单发生金额/1.06
+                new_wholesale_2025 = warehouse_cost + settlement_amount
 
-                    # 新店毛利 = 发生金额/1.06
-                    new_profit_2025 = df_other_settlement['发生金额'].sum() / 1.06
-                else:
-                    old_profit_2025 = 0
-                    new_profit_2025 = 0
+                # 毛利额 = 其他结算单发生金额/1.06
+                new_profit_2025 = settlement_amount
 
-                # 批发额和毛利额
+                # 汇总
                 total_wholesale = old_wholesale_2025 + new_wholesale_2025
                 total_profit = old_profit_2025 + new_profit_2025
             else:

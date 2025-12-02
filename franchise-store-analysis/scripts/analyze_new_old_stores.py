@@ -241,29 +241,47 @@ def analyze_new_old_stores(sales_file, return_file, org_mapping_file, warehouse_
         for category in categories:
             # 黄金外采-新模式使用特殊计算逻辑
             if category == '黄金外采-新模式':
-                # 老店批发/毛利 = 0 (黄金外采是新模式,没有老店)
-                old_wholesale_2025 = 0
-                old_profit_2025 = 0
+                # 区分新店和老店数据
 
-                # 计算入库单总成本
-                warehouse_cost = 0
+                # === 老店数据 ===
+                # 老店入库单总成本
+                old_warehouse_cost = 0
                 if df_warehouse is not None and len(df_warehouse) > 0:
-                    # 确保总成本字段为数字
                     df_warehouse['总成本'] = pd.to_numeric(df_warehouse['总成本'], errors='coerce').fillna(0)
-                    warehouse_cost = df_warehouse['总成本'].sum()
+                    old_warehouse = df_warehouse[df_warehouse['是否新店'] == False]
+                    old_warehouse_cost = old_warehouse['总成本'].sum()
 
-                # 计算其他结算单发生金额/1.06
-                settlement_amount = 0
+                # 老店其他结算单发生金额/1.06
+                old_settlement_amount = 0
                 if df_other_settlement is not None and len(df_other_settlement) > 0:
-                    # 确保发生金额字段为数字
                     df_other_settlement['发生金额'] = pd.to_numeric(df_other_settlement['发生金额'], errors='coerce').fillna(0)
-                    settlement_amount = df_other_settlement['发生金额'].sum() / 1.06
+                    old_settlement = df_other_settlement[df_other_settlement['是否新店'] == False]
+                    old_settlement_amount = old_settlement['发生金额'].sum() / 1.06
 
-                # 批发额 = 入库单总成本 + 其他结算单发生金额/1.06
-                new_wholesale_2025 = warehouse_cost + settlement_amount
+                # 老店批发额 = 老店入库单总成本 + 老店其他结算单发生金额/1.06
+                old_wholesale_2025 = old_warehouse_cost + old_settlement_amount
 
-                # 毛利额 = 其他结算单发生金额/1.06
-                new_profit_2025 = settlement_amount
+                # 老店毛利额 = 老店其他结算单发生金额/1.06
+                old_profit_2025 = old_settlement_amount
+
+                # === 新店数据 ===
+                # 新店入库单总成本
+                new_warehouse_cost = 0
+                if df_warehouse is not None and len(df_warehouse) > 0:
+                    new_warehouse = df_warehouse[df_warehouse['是否新店'] == True]
+                    new_warehouse_cost = new_warehouse['总成本'].sum()
+
+                # 新店其他结算单发生金额/1.06
+                new_settlement_amount = 0
+                if df_other_settlement is not None and len(df_other_settlement) > 0:
+                    new_settlement = df_other_settlement[df_other_settlement['是否新店'] == True]
+                    new_settlement_amount = new_settlement['发生金额'].sum() / 1.06
+
+                # 新店批发额 = 新店入库单总成本 + 新店其他结算单发生金额/1.06
+                new_wholesale_2025 = new_warehouse_cost + new_settlement_amount
+
+                # 新店毛利额 = 新店其他结算单发生金额/1.06
+                new_profit_2025 = new_settlement_amount
 
                 # 汇总
                 total_wholesale = old_wholesale_2025 + new_wholesale_2025

@@ -15,19 +15,15 @@ def filter_warehouse_receipt(df):
     过滤加盟入库单数据
 
     过滤规则：
-    1. 门店含"宁波开元"的全部删除
-    2. 门店含"慈溪附海"且业务时间>=2025-04-25的不计入（使用创建时间判断）
+    1. 门店含"宁波开元"且时间>=2025-01-01的不计入（2024年及之前保留）
+    2. 门店含"慈溪附海"且时间>=2025-04-25的不计入（2025-04-25之前保留）
     3. 门店含"绍兴斗门"的不计入（不分年份）
     4. 单据编码以"JMCX"开头的不计入
     5. 仅保留大类='足金'
     """
     original_count = len(df)
 
-    # 1. 删除门店含"宁波开元"
-    df = df[~df['组织'].str.contains('宁波开元', na=False)]
-    print(f"   剔除'宁波开元'后行数: {len(df)} (减少{original_count - len(df)}行)")
-
-    # 2. 门店含"慈溪附海"且创建时间>=2025-04-25的不计入
+    # 确定时间字段
     time_col = None
     if '业务时间' in df.columns:
         time_col = '业务时间'
@@ -36,11 +32,22 @@ def filter_warehouse_receipt(df):
 
     if time_col:
         df['时间_dt'] = pd.to_datetime(df[time_col], errors='coerce')
+
+        # 1. 门店含"宁波开元"且时间>=2025-01-01的不计入
+        ningbo_kaiyuan_mask = df['组织'].str.contains('宁波开元', na=False) & \
+                              (df['时间_dt'] >= pd.Timestamp('2025-01-01'))
+        before_count = len(df)
+        df = df[~ningbo_kaiyuan_mask]
+        print(f"   剔除'宁波开元'(>=2025-01-01)后行数: {len(df)} (减少{before_count - len(df)}行)")
+
+        # 2. 门店含"慈溪附海"且时间>=2025-04-25的不计入
         cixi_fuhai_mask = df['组织'].str.contains('慈溪附海', na=False) & \
                          (df['时间_dt'] >= pd.Timestamp('2025-04-25'))
         before_count = len(df)
         df = df[~cixi_fuhai_mask]
         print(f"   剔除'慈溪附海'(>=2025-04-25)后行数: {len(df)} (减少{before_count - len(df)}行)")
+    else:
+        print(f"   警告: 未找到时间字段，无法应用宁波开元和慈溪附海的时间过滤规则")
 
     # 3. 门店含"绍兴斗门"的不计入
     before_count = len(df)

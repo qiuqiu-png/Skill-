@@ -58,6 +58,32 @@ python3 scripts/analyze_new_old_stores.py 销售.xlsx 退货.xlsx 组织匹配.x
 python3 scripts/analyze_new_old_stores.py 销售.xlsx 退货.xlsx 组织匹配.xlsx 入库.xlsx 结果.xlsx
 ```
 
+### 2024 vs 2025年度对比分析（新功能）
+
+用于生成2024年和2025年的完整对比报表，自动按年份过滤黄金外采数据：
+
+```bash
+python3 scripts/compare_years.py <2024销售> <2024退货> <2025销售> <2025退货> <组织匹配表> <入库单> <其他结算单> [输出文件]
+```
+
+示例：
+
+```bash
+python3 scripts/compare_years.py \
+  销售2024.xlsx 退货2024.xlsx \
+  销售2025.xlsx 退货2025.xlsx \
+  组织匹配.xlsx 入库单.xlsx 其他结算单.xlsx \
+  2024-2025对比分析.xlsx
+```
+
+**输出内容**：
+- 双层表头美化报表
+- 老店批发/毛利：2024年、2025年、同比增长率、同比差异
+- 新店批发/毛利：2025年数据
+- 2025年新老店合计：批发额、毛利额、同比增长率
+- 黄金外采数据自动按年份过滤（入库单和其他结算单）
+- 颜色标识：增长=绿色，下降=红色
+
 ### 入库单过滤规则
 
 当提供入库单文件时，会自动应用以下过滤规则：

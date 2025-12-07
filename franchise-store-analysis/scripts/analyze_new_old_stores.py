@@ -96,8 +96,8 @@ def analyze_new_old_stores(sales_file, return_file, org_mapping_file, warehouse_
         org_mapping = pd.read_excel(org_mapping_file)
         print(f"   组织数量: {len(org_mapping)}")
 
-        # 处理组织名称，去除末尾的*和M
-        org_mapping['组织'] = org_mapping['加盟门店'].str.replace(r'[*M]+$', '', regex=True)
+        # 处理组织名称，仅去除末尾的*号（保留M）
+        org_mapping['组织'] = org_mapping['加盟门店'].str.replace(r'[*]+$', '', regex=True)
 
         # 创建新店和已闭店字典
         new_stores = set(org_mapping[org_mapping['2025年新店'] == '是']['组织'].values)
@@ -116,8 +116,8 @@ def analyze_new_old_stores(sales_file, return_file, org_mapping_file, warehouse_
         df_sales = df_sales[df_sales['组织'].str.rstrip().str.endswith('M', na=False)]
         print(f"   仅保留以M结尾的门店后行数: {len(df_sales)}")
 
-        # 处理组织名称
-        df_sales['组织_cleaned'] = df_sales['组织'].str.replace(r'[*M]+$', '', regex=True)
+        # 处理组织名称（仅去除*号，保留M）
+        df_sales['组织_cleaned'] = df_sales['组织'].str.replace(r'[*]+$', '', regex=True)
 
         # 剔除已闭店
         df_sales = df_sales[~df_sales['组织_cleaned'].isin(closed_stores)]
@@ -135,8 +135,8 @@ def analyze_new_old_stores(sales_file, return_file, org_mapping_file, warehouse_
         df_return = df_return[df_return['组织'].str.rstrip().str.endswith('M', na=False)]
         print(f"   仅保留以M结尾的门店后行数: {len(df_return)}")
 
-        # 处理组织名称
-        df_return['组织_cleaned'] = df_return['组织'].str.replace(r'[*M]+$', '', regex=True)
+        # 处理组织名称（仅去除*号，保留M）
+        df_return['组织_cleaned'] = df_return['组织'].str.replace(r'[*]+$', '', regex=True)
 
         # 剔除已闭店
         df_return = df_return[~df_return['组织_cleaned'].isin(closed_stores)]
@@ -161,8 +161,8 @@ def analyze_new_old_stores(sales_file, return_file, org_mapping_file, warehouse_
             df_warehouse = df_warehouse[df_warehouse['组织'].str.rstrip().str.endswith('M', na=False)]
             print(f"   仅保留以M结尾的门店后行数: {len(df_warehouse)} (减少{before_count - len(df_warehouse)}行)")
 
-            # 处理组织名称
-            df_warehouse['组织_cleaned'] = df_warehouse['组织'].str.replace(r'[*M]+$', '', regex=True)
+            # 处理组织名称（仅去除*号，保留M）
+            df_warehouse['组织_cleaned'] = df_warehouse['组织'].str.replace(r'[*]+$', '', regex=True)
 
             # 剔除已闭店
             df_warehouse = df_warehouse[~df_warehouse['组织_cleaned'].isin(closed_stores)]
@@ -192,7 +192,7 @@ def analyze_new_old_stores(sales_file, return_file, org_mapping_file, warehouse_
                 df_other_settlement = df_other_settlement[df_other_settlement['加盟门店'].str.rstrip().str.endswith('M', na=False)]
                 print(f"   仅保留以M结尾的门店后行数: {len(df_other_settlement)} (减少{before_count - len(df_other_settlement)}行)")
 
-                df_other_settlement['组织_cleaned'] = df_other_settlement['加盟门店'].str.replace(r'[*M]+$', '', regex=True)
+                df_other_settlement['组织_cleaned'] = df_other_settlement['加盟门店'].str.replace(r'[*]+$', '', regex=True)
 
                 # 剔除已闭店
                 df_other_settlement = df_other_settlement[~df_other_settlement['组织_cleaned'].isin(closed_stores)]

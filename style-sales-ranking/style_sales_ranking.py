@@ -89,6 +89,7 @@ class StyleSalesRanking:
     def classify_item(self, row):
         """
         对单条记录进行分类
+        优先级: 款式名称 > 主题名称 > 三级分类 > 款式大类 > 大类
 
         Args:
             row: DataFrame的一行数据
@@ -96,70 +97,75 @@ class StyleSalesRanking:
         Returns:
             分类名称
         """
-        # 1. 黄金戒指系列
-        if pd.notna(row['三级分类']) and '戒指' in str(row['三级分类']):
-            return '黄金戒指系列'
-
-        # 2. 凤华&凤华2.0
-        if pd.notna(row['主题名称']) and '凤华' in str(row['主题名称']):
-            return '凤华&凤华2.0'
-
-        # 3. 恋恋风情
-        if pd.notna(row['三级分类']) and str(row['三级分类']) == '恋恋风情':
-            return '恋恋风情'
-
-        # 4. 点钻
-        if pd.notna(row['主题名称']) and '繁花' in str(row['主题名称']):
-            return '点钻'
-
-        # 5. 新奢
+        # ===== 优先级1: 款式名称 =====
+        # 5. 新奢 - 款式名称开头是"S-"
         if pd.notna(row['款式']) and str(row['款式']).startswith('S-'):
             return '新奢'
 
-        # 6. 暮光之城
+        # ===== 优先级2: 主题名称 =====
+        # 2. 凤华&凤华2.0 - 主题名称含"凤华"
+        if pd.notna(row['主题名称']) and '凤华' in str(row['主题名称']):
+            return '凤华&凤华2.0'
+
+        # 4. 点钻 - 主题名称含"繁花"
+        if pd.notna(row['主题名称']) and '繁花' in str(row['主题名称']):
+            return '点钻'
+
+        # 6. 暮光之城 - 主题名称含"暮光之城"
         if pd.notna(row['主题名称']) and '暮光之城' in str(row['主题名称']):
             return '暮光之城'
 
-        # 7. 古韵传香
+        # 7. 古韵传香 - 主题名称含"古韵传香"
         if pd.notna(row['主题名称']) and '古韵传香' in str(row['主题名称']):
             return '古韵传香'
 
-        # 8. 锦绣金
-        if pd.notna(row['三级分类']) and str(row['三级分类']) == '锦绣金':
-            return '锦绣金'
-
-        # 17. 爱情灵药
+        # 17. 爱情灵药 - 主题名称含"爱情灵药"
         if pd.notna(row['主题名称']) and '爱情灵药' in str(row['主题名称']):
             return '爱情灵药'
 
-        # 18. 娇玉系列
+        # 18. 娇玉系列 - 主题名称含"娇玉系列"
         if pd.notna(row['主题名称']) and '娇玉系列' in str(row['主题名称']):
             return '娇玉系列'
 
-        # 19. 抖音到店
+        # 19. 抖音到店 - 主题名称含"抖音"
         if pd.notna(row['主题名称']) and '抖音' in str(row['主题名称']):
             return '抖音到店'
 
-        # 20. 盗墓笔记
+        # 20. 盗墓笔记 - 主题名称含"盗墓"
         if pd.notna(row['主题名称']) and '盗墓' in str(row['主题名称']):
             return '盗墓笔记'
 
-        # 21. 中药
+        # 21. 中药 - 主题名称含"中药"或"本草"
         if pd.notna(row['主题名称']) and ('中药' in str(row['主题名称']) or '本草' in str(row['主题名称'])):
             return '中药'
 
-        # 14. Less系列
+        # 14. Less系列 - 主题名称含"Less"
         if pd.notna(row['主题名称']) and 'Less' in str(row['主题名称']):
             return 'Less系列'
 
-        # 15. 彩宝
+        # 15. 彩宝 - 主题名称含"彩宝"
         if pd.notna(row['主题名称']) and '彩宝' in str(row['主题名称']):
             return '彩宝'
 
-        # 11. DIY
+        # ===== 优先级3: 三级分类 =====
+        # 1. 黄金戒指系列 - 三级分类含"戒指"
+        if pd.notna(row['三级分类']) and '戒指' in str(row['三级分类']):
+            return '黄金戒指系列'
+
+        # 3. 恋恋风情 - 三级分类是"恋恋风情"
+        if pd.notna(row['三级分类']) and str(row['三级分类']) == '恋恋风情':
+            return '恋恋风情'
+
+        # 8. 锦绣金 - 三级分类是"锦绣金"
+        if pd.notna(row['三级分类']) and str(row['三级分类']) == '锦绣金':
+            return '锦绣金'
+
+        # ===== 优先级4: 款式大类 =====
+        # 11. DIY - 款式大类是"DIY转运珠"
         if pd.notna(row['款式大类']) and str(row['款式大类']) == 'DIY转运珠':
             return 'DIY'
 
+        # ===== 优先级5: 大类 + 其他条件 =====
         # 判断是否是足金/爱尚金
         is_gold = row['大类'] in ['足金', '足金(新)', '爱尚金']
         is_ke = str(row['计量单位']) == '克'

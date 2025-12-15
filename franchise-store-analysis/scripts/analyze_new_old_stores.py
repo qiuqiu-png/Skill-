@@ -10,6 +10,39 @@ from pathlib import Path
 from datetime import datetime
 
 
+def merge_excel_files(file_paths):
+    """
+    合并多个相似的Excel文件
+
+    参数:
+        file_paths: 单个文件路径(str)或文件路径列表(list)
+
+    返回:
+        合并后的DataFrame
+    """
+    # 如果是字符串，转换为列表
+    if isinstance(file_paths, str):
+        file_paths = [file_paths]
+
+    # 如果只有一个文件，直接读取
+    if len(file_paths) == 1:
+        print(f"   读取单个文件: {file_paths[0]}")
+        return pd.read_excel(file_paths[0], sheet_name=0)
+
+    # 合并多个文件
+    print(f"   检测到 {len(file_paths)} 个文件，开始合并...")
+    dfs = []
+    for i, file_path in enumerate(file_paths, 1):
+        df = pd.read_excel(file_path, sheet_name=0)
+        print(f"   - 文件{i}: {file_path} ({len(df)}行)")
+        dfs.append(df)
+
+    merged_df = pd.concat(dfs, ignore_index=True)
+    print(f"   ✅ 合并完成，总计 {len(merged_df)} 行")
+
+    return merged_df
+
+
 def filter_warehouse_receipt(df):
     """
     过滤加盟入库单数据
@@ -107,10 +140,10 @@ def analyze_new_old_stores(sales_file, return_file, org_mapping_file, warehouse_
         print(f"   2025年新店数量: {len(new_stores)}")
         print(f"   已闭店数量: {len(closed_stores)}")
 
-        # 读取销售数据
+        # 读取销售数据（支持多文件合并）
         print("\n📊 读取销售数据...")
-        df_sales = pd.read_excel(sales_file, sheet_name=0)
-        print(f"   原始数据行数: {len(df_sales)}")
+        df_sales = merge_excel_files(sales_file)
+        print(f"   数据行数: {len(df_sales)}")
 
         # 只保留组织名称以M结尾的门店（可能有空格）
         df_sales = df_sales[df_sales['组织'].str.rstrip().str.endswith('M', na=False)]
@@ -126,10 +159,10 @@ def analyze_new_old_stores(sales_file, return_file, org_mapping_file, warehouse_
         # 标记新店/老店
         df_sales['是否新店'] = df_sales['组织_cleaned'].isin(new_stores)
 
-        # 读取退货数据
+        # 读取退货数据（支持多文件合并）
         print("\n📊 读取退货数据...")
-        df_return = pd.read_excel(return_file, sheet_name=0)
-        print(f"   原始数据行数: {len(df_return)}")
+        df_return = merge_excel_files(return_file)
+        print(f"   数据行数: {len(df_return)}")
 
         # 只保留组织名称以M结尾的门店（可能有空格）
         df_return = df_return[df_return['组织'].str.rstrip().str.endswith('M', na=False)]
@@ -145,12 +178,12 @@ def analyze_new_old_stores(sales_file, return_file, org_mapping_file, warehouse_
         # 标记新店/老店
         df_return['是否新店'] = df_return['组织_cleaned'].isin(new_stores)
 
-        # 读取入库单数据（如果提供）
+        # 读取入库单数据（如果提供，支持多文件合并）
         df_warehouse = None
         if warehouse_file:
             print("\n📊 读取入库单数据...")
-            df_warehouse = pd.read_excel(warehouse_file, sheet_name=0)
-            print(f"   原始数据行数: {len(df_warehouse)}")
+            df_warehouse = merge_excel_files(warehouse_file)
+            print(f"   数据行数: {len(df_warehouse)}")
 
             # 应用入库单过滤规则
             print("   应用过滤规则:")
@@ -171,12 +204,12 @@ def analyze_new_old_stores(sales_file, return_file, org_mapping_file, warehouse_
             # 标记新店/老店
             df_warehouse['是否新店'] = df_warehouse['组织_cleaned'].isin(new_stores)
 
-        # 读取其他结算单数据（如果提供）
+        # 读取其他结算单数据（如果提供，支持多文件合并）
         df_other_settlement = None
         if other_settlement_file:
             print("\n📊 读取其他结算单数据...")
-            df_other_settlement = pd.read_excel(other_settlement_file, sheet_name=0)
-            print(f"   原始数据行数: {len(df_other_settlement)}")
+            df_other_settlement = merge_excel_files(other_settlement_file)
+            print(f"   数据行数: {len(df_other_settlement)}")
 
             # 筛选：已扣款 + 服务费(挂标签）
             df_other_settlement = df_other_settlement[

@@ -11,6 +11,39 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from pathlib import Path
 
 
+def merge_excel_files(file_paths):
+    """
+    合并多个相似的Excel文件
+
+    参数:
+        file_paths: 单个文件路径(str)或文件路径列表(list)
+
+    返回:
+        合并后的DataFrame
+    """
+    # 如果是字符串，转换为列表
+    if isinstance(file_paths, str):
+        file_paths = [file_paths]
+
+    # 如果只有一个文件，直接读取
+    if len(file_paths) == 1:
+        print(f"      读取单个文件: {file_paths[0]}")
+        return pd.read_excel(file_paths[0], sheet_name=0)
+
+    # 合并多个文件
+    print(f"      检测到 {len(file_paths)} 个文件，开始合并...")
+    dfs = []
+    for i, file_path in enumerate(file_paths, 1):
+        df = pd.read_excel(file_path, sheet_name=0)
+        print(f"      - 文件{i}: {file_path} ({len(df)}行)")
+        dfs.append(df)
+
+    merged_df = pd.concat(dfs, ignore_index=True)
+    print(f"      ✅ 合并完成，总计 {len(merged_df)} 行")
+
+    return merged_df
+
+
 def filter_by_year(df, year, time_col='创建时间'):
     """按年份过滤数据"""
     if time_col in df.columns:
@@ -44,37 +77,37 @@ def analyze_year(year, sales_file, return_file, org_mapping,
     print(f"📊 分析{year}年数据")
     print(f"{'='*100}")
     
-    # 读取销售数据
+    # 读取销售数据（支持多文件合并）
     print(f"   读取销售数据...")
-    df_sales = pd.read_excel(sales_file)
+    df_sales = merge_excel_files(sales_file)
     df_sales = process_data(df_sales, '组织', org_mapping['new_stores'], org_mapping['closed_stores'])
     df_sales['销售金额'] = pd.to_numeric(df_sales['销售金额'], errors='coerce').fillna(0)
     df_sales['暂估成本'] = pd.to_numeric(df_sales['暂估成本'], errors='coerce').fillna(0)
     print(f"   销售数据: {len(df_sales)}行")
     
-    # 读取退货数据
+    # 读取退货数据（支持多文件合并）
     print(f"   读取退货数据...")
-    df_return = pd.read_excel(return_file)
+    df_return = merge_excel_files(return_file)
     df_return = process_data(df_return, '组织', org_mapping['new_stores'], org_mapping['closed_stores'])
     df_return['退回金额'] = pd.to_numeric(df_return['退回金额'], errors='coerce').fillna(0)
     df_return['暂估成本'] = pd.to_numeric(df_return['暂估成本'], errors='coerce').fillna(0)
     print(f"   退货数据: {len(df_return)}行")
     
-    # 读取入库单（按年份过滤）
+    # 读取入库单（支持多文件合并，按年份过滤）
     df_warehouse = None
     if warehouse_file:
         print(f"   读取入库单数据...")
-        df_warehouse = pd.read_excel(warehouse_file)
+        df_warehouse = merge_excel_files(warehouse_file)
         df_warehouse = filter_by_year(df_warehouse, year, '创建时间')
         df_warehouse = process_data(df_warehouse, '组织', org_mapping['new_stores'], org_mapping['closed_stores'])
         df_warehouse['总成本'] = pd.to_numeric(df_warehouse['总成本'], errors='coerce').fillna(0)
         print(f"   入库单数据({year}年): {len(df_warehouse)}行")
     
-    # 读取其他结算单（按年份过滤）
+    # 读取其他结算单（支持多文件合并，按年份过滤）
     df_other = None
     if other_settlement_file:
         print(f"   读取其他结算单数据...")
-        df_other = pd.read_excel(other_settlement_file)
+        df_other = merge_excel_files(other_settlement_file)
         df_other = filter_by_year(df_other, year, '创建时间')
         df_other = df_other[
             (df_other['状态'] == '已扣款') &
@@ -83,7 +116,7 @@ def analyze_year(year, sales_file, return_file, org_mapping,
         if '加盟门店' in df_other.columns:
             df_other = process_data(df_other, '加盟门店', org_mapping['new_stores'], org_mapping['closed_stores'])
             df_other['发生金额'] = pd.to_numeric(df_other['发生金额'], errors='coerce').fillna(0)
-        print(f"   其他结算单数据({year}年): {len(df_other)}行")
+        print(f"   其他结算单数据({year}年，已扣款): {len(df_other)}行")
     
     # 按品类统计
     categories = ['黄金', '钻石', '爱尚炫', '18K', '翡翠', '其他']

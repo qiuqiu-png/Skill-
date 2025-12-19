@@ -52,20 +52,24 @@ def filter_by_year(df, year, time_col='创建时间'):
     return df
 
 
-def process_data(df, org_type_col, new_stores, closed_stores):
-    """处理数据：过滤M结尾门店、剔除闭店、标记新老店"""
+def process_data(df, org_type_col, new_stores, closed_stores, all_orgs=None):
+    """处理数据：过滤M结尾门店、剔除闭店、过滤不在匹配表的门店、标记新老店"""
     # 只保留M结尾的门店
     df = df[df[org_type_col].str.rstrip().str.endswith('M', na=False)]
-    
+
     # 清理组织名称（仅去除*号，保留M）
     df['组织_cleaned'] = df[org_type_col].str.replace(r'[*]+$', '', regex=True)
-    
+
     # 剔除已闭店
     df = df[~df['组织_cleaned'].isin(closed_stores)]
-    
+
+    # 过滤掉不在匹配表中的门店（如果提供了all_orgs）
+    if all_orgs is not None:
+        df = df[df['组织_cleaned'].isin(all_orgs)]
+
     # 标记新店/老店
     df['是否新店'] = df['组织_cleaned'].isin(new_stores)
-    
+
     return df
 
 
@@ -77,32 +81,35 @@ def analyze_year(year, sales_file, return_file, org_mapping,
     print(f"📊 分析{year}年数据")
     print(f"{'='*100}")
     
+    # 获取all_orgs（如果有的话）
+    all_orgs = org_mapping.get('all_orgs', None)
+
     # 读取销售数据（支持多文件合并）
     print(f"   读取销售数据...")
     df_sales = merge_excel_files(sales_file)
-    df_sales = process_data(df_sales, '组织', org_mapping['new_stores'], org_mapping['closed_stores'])
+    df_sales = process_data(df_sales, '组织', org_mapping['new_stores'], org_mapping['closed_stores'], all_orgs)
     df_sales['销售金额'] = pd.to_numeric(df_sales['销售金额'], errors='coerce').fillna(0)
     df_sales['暂估成本'] = pd.to_numeric(df_sales['暂估成本'], errors='coerce').fillna(0)
     print(f"   销售数据: {len(df_sales)}行")
-    
+
     # 读取退货数据（支持多文件合并）
     print(f"   读取退货数据...")
     df_return = merge_excel_files(return_file)
-    df_return = process_data(df_return, '组织', org_mapping['new_stores'], org_mapping['closed_stores'])
+    df_return = process_data(df_return, '组织', org_mapping['new_stores'], org_mapping['closed_stores'], all_orgs)
     df_return['退回金额'] = pd.to_numeric(df_return['退回金额'], errors='coerce').fillna(0)
     df_return['暂估成本'] = pd.to_numeric(df_return['暂估成本'], errors='coerce').fillna(0)
     print(f"   退货数据: {len(df_return)}行")
-    
+
     # 读取入库单（支持多文件合并，按年份过滤）
     df_warehouse = None
     if warehouse_file:
         print(f"   读取入库单数据...")
         df_warehouse = merge_excel_files(warehouse_file)
         df_warehouse = filter_by_year(df_warehouse, year, '创建时间')
-        df_warehouse = process_data(df_warehouse, '组织', org_mapping['new_stores'], org_mapping['closed_stores'])
+        df_warehouse = process_data(df_warehouse, '组织', org_mapping['new_stores'], org_mapping['closed_stores'], all_orgs)
         df_warehouse['总成本'] = pd.to_numeric(df_warehouse['总成本'], errors='coerce').fillna(0)
         print(f"   入库单数据({year}年): {len(df_warehouse)}行")
-    
+
     # 读取其他结算单（支持多文件合并，按年份过滤）
     df_other = None
     if other_settlement_file:
@@ -114,7 +121,7 @@ def analyze_year(year, sales_file, return_file, org_mapping,
             (df_other['结算类型'] == '服务费(挂标签）')
         ]
         if '加盟门店' in df_other.columns:
-            df_other = process_data(df_other, '加盟门店', org_mapping['new_stores'], org_mapping['closed_stores'])
+            df_other = process_data(df_other, '加盟门店', org_mapping['new_stores'], org_mapping['closed_stores'], all_orgs)
             df_other['发生金额'] = pd.to_numeric(df_other['发生金额'], errors='coerce').fillna(0)
         print(f"   其他结算单数据({year}年，已扣款): {len(df_other)}行")
     
@@ -349,14 +356,44 @@ if __name__ == "__main__":
     
     org_mapping = {
         'new_stores': set(org_mapping_df[org_mapping_df['2025年新店'] == '是']['组织'].values),
-        'closed_stores': set(org_mapping_df[org_mapping_df['已闭店'] == '是']['组织'].values)
+        'closed_stores': set(org_mapping_df[org_mapping_df['已闭店'] == '是']['组织'].values),
+        'all_orgs': set(org_mapping_df['组织'].values)
     }
-    
+
     print(f"   2025年新店: {len(org_mapping['new_stores'])}个")
     print(f"   已闭店: {len(org_mapping['closed_stores'])}个")
-    
+    print(f"   组织匹配表总数: {len(org_mapping['all_orgs'])}个")
+
+    # 检查是否有组织不在匹配表中
+    print("\n🔍 检查组织匹配情况...")
+    all_data_orgs = set()
+
+    # 收集2024年数据中的组织
+    df_temp = pd.read_excel(sales_2024, nrows=100000)
+    df_temp = df_temp[df_temp['组织'].str.rstrip().str.endswith('M', na=False)]
+    df_temp['组织_cleaned'] = df_temp['组织'].str.replace(r'[*]+$', '', regex=True)
+    all_data_orgs.update(df_temp['组织_cleaned'].unique())
+
+    # 收集2025年数据中的组织
+    df_temp = pd.read_excel(sales_2025, nrows=100000)
+    df_temp = df_temp[df_temp['组织'].str.rstrip().str.endswith('M', na=False)]
+    df_temp['组织_cleaned'] = df_temp['组织'].str.replace(r'[*]+$', '', regex=True)
+    all_data_orgs.update(df_temp['组织_cleaned'].unique())
+
+    # 找出不在匹配表中的组织
+    missing_orgs = all_data_orgs - org_mapping['all_orgs'] - org_mapping['closed_stores']
+
+    if missing_orgs:
+        print(f"\n⚠️  警告：发现 {len(missing_orgs)} 个组织不在组织匹配表中！")
+        print("   以下组织的数据已被过滤，不计入统计：")
+        for org in sorted(missing_orgs):
+            print(f"   - {org}")
+        print("\n   建议将这些组织添加到组织匹配表后重新运行分析。\n")
+    else:
+        print("   ✅ 所有组织都在匹配表中\n")
+
     # 分析2024年
-    results_2024 = analyze_year(2024, sales_2024, return_2024, org_mapping, 
+    results_2024 = analyze_year(2024, sales_2024, return_2024, org_mapping,
                                 warehouse_file, other_file)
     
     # 分析2025年

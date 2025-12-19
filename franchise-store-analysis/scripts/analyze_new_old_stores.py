@@ -263,11 +263,29 @@ def analyze_new_old_stores(sales_file, return_file, org_mapping_file, warehouse_
 
         if missing_orgs:
             print(f"\n⚠️  警告：发现 {len(missing_orgs)} 个组织不在组织匹配表中！")
-            print("   请将以下组织添加到组织匹配表：")
+            print("   以下组织的数据已被过滤，不计入统计：")
             for org in sorted(missing_orgs):
                 print(f"   - {org}")
-            print("\n   这些组织的数据将被视为老店处理。")
-            print("   建议更新组织匹配表后重新运行分析。\n")
+            print("\n   建议将这些组织添加到组织匹配表后重新运行分析。\n")
+
+            # 过滤掉不在匹配表中的门店数据
+            before_sales = len(df_sales)
+            df_sales = df_sales[df_sales['组织_cleaned'].isin(all_orgs_in_mapping)]
+            print(f"   销售数据：过滤前{before_sales}行 -> 过滤后{len(df_sales)}行 (过滤{before_sales - len(df_sales)}行)")
+
+            before_return = len(df_return)
+            df_return = df_return[df_return['组织_cleaned'].isin(all_orgs_in_mapping)]
+            print(f"   退货数据：过滤前{before_return}行 -> 过滤后{len(df_return)}行 (过滤{before_return - len(df_return)}行)")
+
+            if df_warehouse is not None:
+                before_warehouse = len(df_warehouse)
+                df_warehouse = df_warehouse[df_warehouse['组织_cleaned'].isin(all_orgs_in_mapping)]
+                print(f"   入库单：过滤前{before_warehouse}行 -> 过滤后{len(df_warehouse)}行 (过滤{before_warehouse - len(df_warehouse)}行)")
+
+            if df_other_settlement is not None:
+                before_settlement = len(df_other_settlement)
+                df_other_settlement = df_other_settlement[df_other_settlement['组织_cleaned'].isin(all_orgs_in_mapping)]
+                print(f"   其他结算单：过滤前{before_settlement}行 -> 过滤后{len(df_other_settlement)}行 (过滤{before_settlement - len(df_other_settlement)}行)")
         else:
             print("   ✅ 所有组织都在匹配表中")
 

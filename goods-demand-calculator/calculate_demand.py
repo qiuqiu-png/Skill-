@@ -38,7 +38,6 @@ def calculate_goods_demand(input_file, output_file=None):
     e_col = column_index_from_string('E')   # 二级分类
     g_col = column_index_from_string('G')   # 周期类型
     ci_col = column_index_from_string('CI')  # 补单数量
-    cj_col = column_index_from_string('CJ')  # 补单重量
     ds_col = column_index_from_string('DS')  # 门店数据开始列
     yd_col = column_index_from_string('YD')  # 门店数据结束列
 
@@ -108,13 +107,6 @@ def calculate_goods_demand(input_file, output_file=None):
         e_val = ws.cell(row_idx, e_col).value
         is_diy = (e_val == 'DIY')
 
-        # 获取CJ列补单重量（DIY商品需要用到）
-        cj_val = ws.cell(row_idx, cj_col).value
-        try:
-            cj_num = float(cj_val) if cj_val is not None else 0
-        except:
-            cj_num = 0
-
         # 对每个门店处理
         for store in stores:
             # 获取库存、销售、在途
@@ -152,7 +144,7 @@ def calculate_goods_demand(input_file, output_file=None):
                 # DIY商品的特殊规则
                 if calc < 0:
                     # 库存+在途-销售 < 0
-                    if cj_num > 500:
+                    if ci_num > 500:
                         demand_value = abs(calc) * 5
                     else:
                         demand_value = abs(calc) * 2

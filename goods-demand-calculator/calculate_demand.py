@@ -35,6 +35,7 @@ def calculate_goods_demand(input_file, output_file=None):
 
     # 定义列索引
     b_col = column_index_from_string('B')   # 大类
+    c_col = column_index_from_string('C')   # 小类
     e_col = column_index_from_string('E')   # 二级分类
     g_col = column_index_from_string('G')   # 周期类型
     ci_col = column_index_from_string('CI')  # 补单数量
@@ -103,9 +104,11 @@ def calculate_goods_demand(input_file, output_file=None):
         if ci_num <= 0:
             continue
 
-        # 获取E列二级分类（判断是否为DIY）
+        # 获取C列小类和E列二级分类
+        c_val = ws.cell(row_idx, c_col).value
         e_val = ws.cell(row_idx, e_col).value
         is_diy = (e_val == 'DIY')
+        is_ring = (c_val == '戒指')
 
         # 对每个门店处理
         for store in stores:
@@ -155,13 +158,31 @@ def calculate_goods_demand(input_file, output_file=None):
                     # 库存+在途-销售 > 0，且销售>1的，填1
                     if sal > 1:
                         demand_value = 1
-            else:
-                # 普通商品的规则
+            elif is_ring:
+                # 非DIY戒指的规则
                 if calc < 0:
                     demand_value = abs(calc)
                 elif calc == 0:
                     demand_value = 1
-                # calc > 0 时不填充
+                else:
+                    # calc > 0
+                    # 2<=库存+在途<=4 且 销售>1时，填1
+                    if 2 <= (inv + itr) <= 4 and sal > 1:
+                        demand_value = 1
+                    # 库存+在途<1 且 销售=0时，不填
+                    # 其他情况也不填
+            else:
+                # 非DIY非戒指的规则
+                if calc < 0:
+                    demand_value = abs(calc)
+                elif calc == 0:
+                    # 库存+在途>1时不填，库存+在途<=1且销售=1时填1
+                    if (inv + itr) <= 1 and sal == 1:
+                        demand_value = 1
+                else:
+                    # calc > 0
+                    # 库存+在途>1 且 销售>1时，不填（其他情况也不填）
+                    pass
 
             # 填充需求列
             if demand_value is not None:

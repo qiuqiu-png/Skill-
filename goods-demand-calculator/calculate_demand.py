@@ -3,11 +3,12 @@
 """
 货盘需求计算器
 根据库存、在途、销售数据自动计算门店补货需求量
+支持普通商品和DIY商品的差异化计算规则
 """
 
 import sys
 from openpyxl import load_workbook
-from openpyxl.utils import column_index_from_string
+from openpyxl.utils import column_index_from_string, get_column_letter
 
 
 def calculate_goods_demand(input_file, output_file=None):
@@ -26,130 +27,167 @@ def calculate_goods_demand(input_file, output_file=None):
             output_file = input_file + '_处理后.xlsx'
 
     print("正在加载Excel文件...")
-    wb = load_workbook(input_file)
+    wb = load_workbook(input_file, keep_vba=False, data_only=False, keep_links=False)
     ws = wb.active
 
     print(f"工作表名称: {ws.title}")
-    print(f"总行数: {ws.max_row}")
+    print(f"总行数: {ws.max_row}, 总列数: {ws.max_column}")
 
-    # DS列到YD列的列号
-    ds_col = column_index_from_string('DS')
-    yd_col = column_index_from_string('YD')
-    ci_col = column_index_from_string('CI')
+    # 定义列索引
+    b_col = column_index_from_string('B')   # 大类
+    e_col = column_index_from_string('E')   # 二级分类
+    g_col = column_index_from_string('G')   # 周期类型
+    ci_col = column_index_from_string('CI')  # 补单数量
+    cj_col = column_index_from_string('CJ')  # 补单重量
+    ds_col = column_index_from_string('DS')  # 门店数据开始列
+    yd_col = column_index_from_string('YD')  # 门店数据结束列
 
-    # 第一步：获取第6行的门店分组（合并单元格）
-    print("\n=== 第一步：获取门店分组 ===")
-    store_groups = []
-    for merged_range in ws.merged_cells.ranges:
-        if merged_range.min_row == 6 and merged_range.max_row == 6:
-            if merged_range.min_col >= ds_col and merged_range.min_col <= yd_col:
-                cell_value = ws.cell(6, merged_range.min_col).value
-                store_groups.append({
-                    'name': cell_value,
-                    'min_col': merged_range.min_col,
-                    'max_col': merged_range.max_col
+    # 第一步：获取第6行的门店分组（每个门店占4列：库存、销售、在途、需求）
+    print("\n=== 第一步：识别门店分组 ===")
+    stores = []
+    current_col = ds_col
+
+    while current_col <= yd_col:
+        store_name = ws.cell(6, current_col).value
+        if store_name:
+            # 检查第7行的列标题是否符合预期
+            h1 = ws.cell(7, current_col).value
+            h2 = ws.cell(7, current_col + 1).value
+            h3 = ws.cell(7, current_col + 2).value
+            h4 = ws.cell(7, current_col + 3).value
+
+            if h1 == '库存' and h2 == '销售' and h3 == '在途' and h4 == '需求':
+                stores.append({
+                    'name': store_name,
+                    'inventory_col': current_col,      # 库存
+                    'sales_col': current_col + 1,      # 销售
+                    'intransit_col': current_col + 2,  # 在途
+                    'demand_col': current_col + 3      # 需求
                 })
+                current_col += 4
+            else:
+                current_col += 1
+        else:
+            current_col += 1
 
-    # 按列号排序
-    store_groups.sort(key=lambda x: x['min_col'])
-    print(f"找到 {len(store_groups)} 个门店分组")
+    print(f"找到 {len(stores)} 个门店")
+    if stores:
+        print(f"门店示例: {stores[0]['name']}, {stores[1]['name'] if len(stores) > 1 else ''}")
 
-    # 第二步：对于每个门店分组，找到其中的"库存"、"在途"、"销售"、"需求"列
-    print("\n=== 第二步：查找每个门店的关键列 ===")
-    for store in store_groups:
-        # 在第7行中查找对应的列标题
-        store_cols = {}
-        for col_idx in range(store['min_col'], store['max_col'] + 1):
-            header = ws.cell(7, col_idx).value
-            if header:
-                header = str(header).strip()
-                if header == '库存':
-                    store_cols['库存'] = col_idx
-                elif header == '在途':
-                    store_cols['在途'] = col_idx
-                elif header == '销售':
-                    store_cols['销售'] = col_idx
-                elif header == '需求':
-                    store_cols['需求'] = col_idx
+    # 第二步：筛选符合条件的行并计算需求
+    print("\n=== 第二步：处理数据 ===")
+    print("筛选条件: B列=足金/足金（新）、G列=21天周期、CI列补单数>0")
 
-        store['cols'] = store_cols
+    processed_count = 0
+    skipped_rows = 0
 
-    # 统计有完整列的门店数量
-    valid_stores = sum(1 for s in store_groups if len(s['cols']) == 4)
-    print(f"有完整列（库存/在途/销售/需求）的门店: {valid_stores}/{len(store_groups)}")
-
-    # 第三步：筛选符合条件的行
-    print("\n=== 第三步：筛选符合条件的行 ===")
-    valid_rows = []
     for row_idx in range(8, ws.max_row + 1):
-        b_val = ws.cell(row_idx, 2).value  # B列
-        ci_val = ws.cell(row_idx, ci_col).value  # CI列
+        # 获取筛选条件列的值
+        b_val = ws.cell(row_idx, b_col).value
+        g_val = ws.cell(row_idx, g_col).value
+        ci_val = ws.cell(row_idx, ci_col).value
 
-        # 检查B列是否为"足金"或"足金（新）"
-        if b_val and (str(b_val).strip() == '足金' or str(b_val).strip() == '足金（新）'):
-            # 检查CI列是否>0
-            if ci_val and isinstance(ci_val, (int, float)) and ci_val > 0:
-                valid_rows.append(row_idx)
+        # 筛选条件1：B列=足金或足金（新）
+        if b_val not in ['足金', '足金（新）']:
+            continue
 
-    print(f"找到 {len(valid_rows)} 行符合条件（B列=足金/足金（新） 且 CI列>0）")
-    if len(valid_rows) > 0:
-        print(f"行号范围: {valid_rows[0]} - {valid_rows[-1]}")
+        # 筛选条件2：G列=21天周期
+        if g_val != '21天周期':
+            continue
 
-    # 第四步：处理每个符合条件的行
-    print("\n=== 第四步：填写需求值 ===")
-    update_count = 0
-    skip_count = 0
+        # 筛选条件3：CI列补单数>0
+        try:
+            ci_num = float(ci_val) if ci_val is not None else 0
+        except:
+            ci_num = 0
 
-    for row_idx in valid_rows:
-        # 对每个门店分组进行处理
-        for store in store_groups:
-            cols = store['cols']
+        if ci_num <= 0:
+            continue
 
-            # 检查是否有所有需要的列
-            if '库存' not in cols or '在途' not in cols or '销售' not in cols or '需求' not in cols:
-                skip_count += 1
-                continue
+        # 获取E列二级分类（判断是否为DIY）
+        e_val = ws.cell(row_idx, e_col).value
+        is_diy = (e_val == 'DIY')
 
-            # 获取库存、在途、销售的值
-            inventory = ws.cell(row_idx, cols['库存']).value
-            in_transit = ws.cell(row_idx, cols['在途']).value
-            sales = ws.cell(row_idx, cols['销售']).value
+        # 获取CJ列补单重量（DIY商品需要用到）
+        cj_val = ws.cell(row_idx, cj_col).value
+        try:
+            cj_num = float(cj_val) if cj_val is not None else 0
+        except:
+            cj_num = 0
 
-            # 转换为数值，如果为None则为0
-            inventory = float(inventory) if inventory and isinstance(inventory, (int, float)) else 0
-            in_transit = float(in_transit) if in_transit and isinstance(in_transit, (int, float)) else 0
-            sales = float(sales) if sales and isinstance(sales, (int, float)) else 0
+        # 对每个门店处理
+        for store in stores:
+            # 获取库存、销售、在途
+            inventory = ws.cell(row_idx, store['inventory_col']).value
+            sales = ws.cell(row_idx, store['sales_col']).value
+            intransit = ws.cell(row_idx, store['intransit_col']).value
+
+            # 转换为数值
+            try:
+                inv = float(inventory) if inventory is not None else 0
+            except:
+                inv = 0
+
+            try:
+                sal = float(sales) if sales is not None else 0
+            except:
+                sal = 0
+
+            try:
+                itr = float(intransit) if intransit is not None else 0
+            except:
+                itr = 0
 
             # 忽略销售<=0或为空的门店
-            if sales <= 0:
+            if sal <= 0:
                 continue
 
-            # 计算：库存 + 在途 - 销售
-            diff = inventory + in_transit - sales
+            # 计算库存+在途-销售
+            calc = inv + itr - sal
 
-            # 根据条件填写需求值
-            demand_col = cols['需求']
-            if diff < 0:
-                # 库存+在途-销售 < 0，填写绝对值*2
-                demand_value = abs(diff) * 2
-                ws.cell(row_idx, demand_col).value = demand_value
-                update_count += 1
+            # 根据规则填充需求列
+            demand_value = None
+
+            if is_diy:
+                # DIY商品的特殊规则
+                if calc < 0:
+                    # 库存+在途-销售 < 0
+                    if cj_num > 500:
+                        demand_value = abs(calc) * 5
+                    else:
+                        demand_value = abs(calc) * 2
+                elif calc == 0:
+                    # 库存+在途-销售 = 0
+                    demand_value = 1
+                else:
+                    # 库存+在途-销售 > 0
+                    demand_value = abs(calc)
             else:
-                # 库存+在途-销售 >= 0，填写1
-                ws.cell(row_idx, demand_col).value = 1
-                update_count += 1
+                # 普通商品的规则
+                if calc < 0:
+                    demand_value = abs(calc)
+                elif calc == 0:
+                    demand_value = 1
+                # calc > 0 时不填充
 
-    print(f"共更新了 {update_count} 个单元格的需求值")
-    if skip_count > 0:
-        print(f"跳过了 {skip_count} 个不完整的门店数据")
+            # 填充需求列
+            if demand_value is not None:
+                ws.cell(row_idx, store['demand_col']).value = demand_value
+                processed_count += 1
+
+        # 进度提示
+        if row_idx % 500 == 0:
+            print(f"  已处理到第 {row_idx} 行...")
+
+    print(f"\n✅ 处理完成！")
+    print(f"📊 共填充了 {processed_count} 个需求单元格")
 
     # 保存文件
-    print("\n正在保存文件...")
+    print(f"\n正在保存文件到: {output_file}")
     wb.save(output_file)
     wb.close()
 
-    print(f"\n✅ 处理完成！")
-    print(f"📁 输出文件: {output_file}")
+    print(f"✅ 文件已保存！")
 
     return output_file
 

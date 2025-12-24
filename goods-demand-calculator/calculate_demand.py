@@ -160,8 +160,9 @@ def calculate_goods_demand(input_file, output_file=None):
                     # 库存+在途-销售 = 0
                     demand_value = 1
                 else:
-                    # 库存+在途-销售 > 0
-                    demand_value = abs(calc)
+                    # 库存+在途-销售 > 0，且销售>1的，填1
+                    if sal > 1:
+                        demand_value = 1
             else:
                 # 普通商品的规则
                 if calc < 0:
